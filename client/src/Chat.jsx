@@ -1,24 +1,40 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import Avatar from "./Avatar";
 import Logo from "./Logo";
 import { UserContext } from "./UserContext";
 import { uniqBy } from "lodash";
+import axios from "axios";
+
 
 export default function Chat() {
 
   const [ ws, setWs] = useState(null);
   const [onlinePeople, setonlinePeople] = useState({});
+  const [offlinePeople, setofflinePeople] = useState({});
   const [selectedUserId, setselectedUserId] = useState(null);
   const [newMessageText, setnewMessageText] = useState('');
   const [messages, setmessages] = useState([]);
+  const divUnderMessage = useRef();
+
 
   const {userName, id} = useContext(UserContext);
 
   useEffect(()=>{
+    connectionToWS();
+  },[]);
+
+  function connectionToWS () {
     let ws = new WebSocket('ws://localhost:4000');
     setWs(ws);
     ws.addEventListener('message', handleMessage);
-  },[]);
+    //tries to reconnect if connection is lost
+    ws.addEventListener('close', ()=>{
+      setTimeout(()=>{
+        console.log("Disconnected. Trying to reconnect...");
+        connectionToWS();
+      }, 1000);
+    });
+  }
 
   const showOnlinePeople = (peopleArray) =>{
     const people = {};
@@ -48,13 +64,43 @@ export default function Chat() {
     ws.send(JSON.stringify({
       recipient: selectedUserId,
       text: newMessageText,
+      sender: id,
+      _id: Date.now()
     }))
 
-    setmessages(prev => ([...prev, {text:newMessageText, sender:id, recipient:selectedUserId, id: Date.now(),}]));
+    setmessages(prev => ([...prev, {text:newMessageText, sender:id, recipient:selectedUserId, _id: Date.now(),}]));
     setnewMessageText('');
   }
 
-  const messagesWithoutDups = uniqBy(messages, 'id');
+  useEffect(()=>{
+    if(selectedUserId){ 
+      axios.get('/messages/'+selectedUserId)
+        .then(res => {
+          setmessages(res.data);
+        }) 
+    }
+  },[selectedUserId])
+
+  useEffect(()=>{
+    const div = divUnderMessage.current;
+    if(div){
+      div.scrollIntoView({behavior:'smooth', block:'end'});
+    }
+  },[messages]);
+
+  useEffect(()=>{
+    axios.get('/people').then(res => {
+      const people = res.data;
+      const offlinePeopleArr = people.filter(p => p._id !== id)
+                                  .filter(p => !Object.keys(onlinePeople).includes(p._id));
+      console.log(offlinePeople);
+      const offlinePeopleObj = {};
+      offlinePeopleArr.forEach(p => offlinePeopleObj[p._id] = p);
+      setofflinePeople(offlinePeopleObj);
+    })
+  },[onlinePeople])
+
+  const messagesWithoutDups = uniqBy(messages, '_id');
 
 
   return (
@@ -70,12 +116,15 @@ export default function Chat() {
                   onClick={() => setselectedUserId(userId)}
                   >
                 { userId === selectedUserId ? <div className=" bg-green-700 w-2"></div> : "" }
-                <Avatar userId={userId} username={onlinePeople[userId]}/>
+                <Avatar online={true} userId={userId} username={onlinePeople[userId]}/>
                 {onlinePeople[userId]}
               </div>
             )
           }
-        })}
+          })
+        }
+
+        
       </div>
 
 
@@ -92,13 +141,14 @@ export default function Chat() {
                 <div className="overflow-y-scroll absolute top-0 left-0 right-0 bottom-2">
                   {messagesWithoutDups.map(message => {
                     return (
-                      <div className={(message.sender === id ? 'text-right': 'text-left')}>
-                        <div className={" text-left inline-block p-2 my-2 rounded-md text-sm "+(message.sender===id?" bg-blue-500 text-white" : "bg-white text-grey-500")}>
+                      <div key={message._id} className={(message.sender === id ? 'text-right': 'text-left')}>
+                        <div  className={" text-left inline-block p-2 my-2 rounded-md text-sm "+(message.sender===id?" bg-blue-500 text-white" : "bg-white text-grey-500")}>
                             {message.sender === id? 'Me : ':''}{message.text}
                         </div>
                       </div>
                     )
                   })}
+                  <div className="" ref={divUnderMessage}></div>
                 </div>
               </div>
             )}
