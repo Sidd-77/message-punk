@@ -2,6 +2,7 @@ import { useContext, useEffect, useState } from "react";
 import Avatar from "./Avatar";
 import Logo from "./Logo";
 import { UserContext } from "./UserContext";
+import { uniqBy } from "lodash";
 
 export default function Chat() {
 
@@ -33,9 +34,9 @@ export default function Chat() {
     if('online' in messageData){
       showOnlinePeople(messageData.online);
     }
-    console.log(messageData);
+
     if(messageData.text){
-      setmessages(prev => ([...prev, {text:messageData.text, isOur:false}]));
+      setmessages(prev => ([...prev, {...messageData}]));
     }
 
   }
@@ -49,10 +50,11 @@ export default function Chat() {
       text: newMessageText,
     }))
 
-    setmessages(prev => ([...prev, {text:newMessageText, isOur:true}]));
+    setmessages(prev => ([...prev, {text:newMessageText, sender:id, recipient:selectedUserId, id: Date.now(),}]));
     setnewMessageText('');
   }
 
+  const messagesWithoutDups = uniqBy(messages, 'id');
 
 
   return (
@@ -86,14 +88,18 @@ export default function Chat() {
             )}
 
             {!!selectedUserId && (
-              <div>
-                {messages.map(message => {
-                  return <div className={" bg-white flex p-2 my-2 "}>
-                    <div className=" content-end">
-                      {message.text}
-                    </div>
-                  </div>
-                })}
+              <div className="relative h-full">
+                <div className="overflow-y-scroll absolute top-0 left-0 right-0 bottom-2">
+                  {messagesWithoutDups.map(message => {
+                    return (
+                      <div className={(message.sender === id ? 'text-right': 'text-left')}>
+                        <div className={" text-left inline-block p-2 my-2 rounded-md text-sm "+(message.sender===id?" bg-blue-500 text-white" : "bg-white text-grey-500")}>
+                            {message.sender === id? 'Me : ':''}{message.text}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             )}
         </div>
