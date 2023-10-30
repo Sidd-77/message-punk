@@ -116,6 +116,9 @@ app.post('/login', async(req, res)=>{
     }
 })
 
+app.post('/logout', (req, res)=>{
+    res.cookie('token','', {sameSite:'none', secure:true}).json("Logged out");
+})
 
 
 const server = app.listen(4000, ()=>{
@@ -125,6 +128,36 @@ const server = app.listen(4000, ()=>{
 const wss = new ws.WebSocketServer({server:server});
 
 wss.on('connection', (connection, req)=>{
+
+    function notifyAboutOnlinePeople () {
+        [...wss.clients].forEach((client) => {
+            client.send(JSON.stringify({
+                online: [...wss.clients].map(c => ({userId:c.userId, username:c.username}))
+            }))
+        })
+    }
+
+    connection.isAlive = true;
+
+    connection.timer = setInterval(()=>{
+        connection.ping();
+        connection.deathTimer = setTimeout(() => {
+            connection.isAlive = false;
+            clearInterval(connection.deathTimer);
+            connection.terminate();
+            notifyAboutOnlinePeople();
+        },1000);
+    },5000)
+
+    connection.on('pong',()=>{
+        clearTimeout(connection.deathTimer);
+    })
+
+
+
+
+
+
     let cookies = req.headers.cookie;
     if(cookies){
         let tokenCookieString = cookies.split('; ').find(str => str.startsWith('token='));
@@ -144,7 +177,8 @@ wss.on('connection', (connection, req)=>{
 
     connection.on('message', async (message)=>{
         const messageData = JSON.parse(message.toString());
-        const {recipient, text} = messageData;
+        const {recipient, text, file} = messageData;
+        console.log(file);
         if(recipient && text){
             const messageDoc = await Message.create({
                 sender: connection.userId,
@@ -164,12 +198,9 @@ wss.on('connection', (connection, req)=>{
         }
     });
 
-    [...wss.clients].forEach((client) => {
-        client.send(JSON.stringify({
-            online: [...wss.clients].map(c => ({userId:c.userId, username:c.username}))
-        }))
-    })
+    notifyAboutOnlinePeople();
 
 })
+
 
 

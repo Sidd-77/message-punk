@@ -1,0 +1,15 @@
+{
+  "name": "message-punk",
+  "version": "1.0.0",
+  "description": "....",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start-fe": "cd client && npm run dev",
+    "start-be": "cd server && node index.js",
+    "build-fe": "cd client && npm i",
+    "build-be": "cd server && npm i"
+  },
+  "author": "",
+  "license": "ISC"
+}
