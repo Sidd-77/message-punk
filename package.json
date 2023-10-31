@@ -11,5 +11,7 @@
     "build-be": "cd server && npm i"
   },
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+  }
 }
